@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bundlemap"
+version = "0.1.0"
+description = "Static JS-bundle endpoint discovery and fuzzing prep for authorized pentest recon."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+bundlemap = "bundlemap.cli:main"
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6", "mypy>=1.11"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bundlemap"]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PTH"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src"]
