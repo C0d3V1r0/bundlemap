@@ -4,10 +4,11 @@ import argparse
 import logging
 from pathlib import Path
 
-from bundlemap.bases import resolve_bases
+from bundlemap.bases import Bases, resolve_bases
 from bundlemap.extract import extract_all, normalize
-from bundlemap.loader import StdlibFetcher, load
-from bundlemap.models import BundlemapError, Confidence, Endpoint, meets
+from bundlemap.headless import load_headless
+from bundlemap.loader import StdlibFetcher, _is_url, load
+from bundlemap.models import BundlemapError, Confidence, Endpoint, Observation, meets
 from bundlemap.output import print_summary, write_endpoints_json, write_fuzz_artifacts
 from bundlemap.surface import classify
 
@@ -80,7 +81,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 0.1.0",
+        version="%(prog)s 0.2.0",
+    )
+
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="capture live requests via headless browser instead of static parsing",
+    )
+
+    parser.add_argument(
+        "--wait",
+        type=float,
+        default=3.0,
+        metavar="SECONDS",
+        help="extra seconds to wait after page load in headless mode (default: 3.0)",
     )
 
     return parser
@@ -103,21 +118,46 @@ def _run_scan(args: argparse.Namespace) -> int:
     if args.timeout <= 0:
         raise BundlemapError(f"--timeout must be positive, got {args.timeout}")
 
-    sources = load(
-        args.target,
-        scope=args.scope,
-        fetcher=StdlibFetcher(),
-        allow_fetch=not args.no_fetch,
-        timeout=args.timeout,
-    )
+    target_is_url = _is_url(args.target)
 
-    observations = [obs for src in sources for obs in extract_all(src)]
+    if args.headless and not target_is_url:
+        raise BundlemapError("--headless requires a URL target")
 
-    bases = resolve_bases(
-        (obs.path for obs in observations),
-        (src.text for src in sources),
-    )
+    # run static unless the user forbade fetching on a URL (local paths always run static)
+    run_static = not args.no_fetch or not target_is_url
 
+    if not run_static and not args.headless:
+        raise BundlemapError("nothing to scan: --no-fetch on a URL target requires --headless")
+
+    observations_static: list[Observation] = []
+    bases: Bases = {}
+
+    if run_static:
+        sources = load(
+            args.target,
+            scope=args.scope,
+            fetcher=StdlibFetcher(),
+            allow_fetch=not args.no_fetch,
+            timeout=args.timeout,
+        )
+
+        observations_static = [obs for src in sources for obs in extract_all(src)]
+
+        bases = resolve_bases(
+            (obs.path for obs in observations_static),
+            (src.text for src in sources),
+        )
+
+    observations_headless: list[Observation] = []
+
+    if args.headless:
+        observations_headless = load_headless(
+            args.target,
+            scope=args.scope,
+            wait=args.wait,
+        )
+
+    observations = observations_static + observations_headless
     ranked = classify(normalize(observations, bases))
     endpoints = _filter(ranked, args)
     out_dir = Path(args.out or "out")

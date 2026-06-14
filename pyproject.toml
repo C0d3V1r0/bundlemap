@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bundlemap"
-version = "0.1.0"
+version = "0.2.0"
 description = "Static JS-bundle endpoint discovery and fuzzing prep for authorized pentest recon."
 requires-python = ">=3.10"
 dependencies = []
@@ -14,6 +14,7 @@ bundlemap = "bundlemap.cli:main"
 
 [project.optional-dependencies]
 dev = ["ruff>=0.6", "mypy>=1.11"]
+headless = ["playwright>=1.40"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bundlemap"]

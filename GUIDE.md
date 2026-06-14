@@ -24,9 +24,31 @@ Filter with `--min-confidence`; use `medium` for a clean API-only map.
 
 | Level | Source | What it means |
 |---|---|---|
-| `high` | Actual call site (`fetch`/`axios`/`xhr.open`) | Almost certainly a live endpoint — method and body fields are known. |
+| `high` | Live request (headless) or call site (`fetch`/`axios`/`xhr.open`) | Almost certainly a live endpoint — method and body fields are known. |
 | `medium` | Bare string literal containing `/api` | Looks like an API path, but no call site visible. |
 | `low` | Other bare path literals | Likely frontend routes or constants — noisy. |
+
+## Hybrid mode (`--headless`)
+
+`--headless` runs both pipelines and merges the results:
+
+1. **Static** — parses the JS bundle; finds hidden and auth-gated routes that the browser never requests on a cold load.
+2. **Headless** — opens the target in Chromium and intercepts every live network request; captured endpoints get `high` confidence.
+
+Duplicates are merged automatically: if the same `(method, path)` appears in both, the highest confidence wins and body fields are unioned.
+
+```bash
+bundlemap https://app.example.com/ --scope example.com --headless --fuzz
+```
+
+`--wait` adds extra seconds after `networkidle` to catch deferred requests (default: `3.0`).
+
+Requires the `headless` extra:
+
+```bash
+pip install -e '.[headless]'
+python -m playwright install chromium
+```
 
 ## Tags — what to look at
 
